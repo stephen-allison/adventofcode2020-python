@@ -1,11 +1,7 @@
 from operator import add, mul
 from functools import partial
 
-OPS = {
-    '+': add,
-    '*': mul
-}
-
+OPS = {'+': add, '*': mul}
 SUBEXPR_START = '('
 SUBEXPR_END = ')'
 V1_PRECEDENCE = [['+', '*']]
@@ -21,13 +17,13 @@ class Expr:
     def __init__(self, left=None, right=None, op=None):
         self._left = left
         self._right = right
-        self.op = op
+        self._op = op
 
     def eval(self):
-        return self.op(self._left.eval(), self._right.eval())
+        return self._op(self._left.eval(), self._right.eval())
 
     def __str__(self):
-        return f'expr: L:{self._left} Op:{self.op} R:{self._right}'
+        return f'expr: L:{self._left} Op:{self._op} R:{self._right}'
 
 
 class Num:
@@ -41,54 +37,49 @@ class Num:
         return f'Num({self.val})'
 
 
-def scan_expression(expression, start=0, expression_end=None):
+def tokenize(expression):
     digits = []
-    output = []
-    i = start
+    tokens = []
 
-    def read_digits():
-        n = (int(''.join(digits)))
-        output.append(n)
-        digits[:] = []
+    def store_number_token():
+        if digits:
+            n = (int(''.join(digits)))
+            tokens.append(n)
+            digits[:] = []
 
-    while i < len(expression):
-        c = expression[i]
-
+    for c in expression:
         if c in '0123456789':
             digits.append(c)
-        elif digits:
-            read_digits()
+        else:
+            if digits:
+                store_number_token()
+            if c in OPS or c in (SUBEXPR_START, SUBEXPR_END):
+                tokens.append(c)
 
-        if c in OPS:
-            output.append(c)
-        elif c == SUBEXPR_START:
-            i, expr = scan_expression(expression, i + 1, SUBEXPR_END)
-            output.append(expr)
-        elif c == expression_end:
-            return i, output
+    store_number_token()
 
-        i += 1
-
-    if digits:
-        read_digits()
-
-    return i, output
+    return tokens
 
 
-def list_to_expr(expr_list, builder):
+def build_expression(tokens, builder, start=0, expression_end=None):
     exprs = []
-    for item in expr_list:
-        if type(item) == list:
-            ex = list_to_expr(item, builder)
+    i = start
+    while i < len(tokens):
+        item = tokens[i]
+        if item == SUBEXPR_START:
+            i, ex = build_expression(tokens, builder, i + 1, SUBEXPR_END)
+        elif item == expression_end:
+            break
         elif item in OPS:
             ex = item
         else:
             ex = Num(item)
         exprs.append(ex)
-    return builder(exprs)
+        i += 1
+    return i, builder(exprs)
 
 
-def build(precedence, exprs):
+def group_expressions(precedence, exprs):
     for prec in precedence:
         for i in range(len(exprs)):
             item = exprs[i]
@@ -103,14 +94,14 @@ def build(precedence, exprs):
 
 
 def evaluate(expression, builder):
-    _, s = scan_expression(expression)
-    exp = list_to_expr(s, builder)
+    s = tokenize(expression)
+    _, exp = build_expression(s, builder)
     ans = exp.eval()
     return ans
 
 
 def solve():
-    builder = partial(build, V1_PRECEDENCE)
+    builder = partial(group_expressions, V1_PRECEDENCE)
 
     assert evaluate('2 * 3 + (4 * 5)', builder) == 26
     assert evaluate('1 + ((2 * 5) + 3) + 9', builder) == 23
@@ -119,13 +110,10 @@ def solve():
     answers = [evaluate(exp, builder) for exp in load_expressions()]
     print(f'part one answer = {sum(answers)}')
 
-    builder2 = partial(build, V2_PRECEDENCE)
+    builder2 = partial(group_expressions, V2_PRECEDENCE)
     answers = [evaluate(exp, builder2) for exp in load_expressions()]
     print(f'part two answer = {sum(answers)}')
 
-def test():
-    builder = partial(build, V1_PRECEDENCE)
-    evaluate('2 * 3 + (4 * 5)', builder)
 
 if __name__ == '__main__':
     solve()
