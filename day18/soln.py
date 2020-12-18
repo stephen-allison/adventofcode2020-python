@@ -1,13 +1,19 @@
 from operator import add, mul
+from functools import partial
+
+OPS = {
+    '+': add,
+    '*': mul
+}
+
+V1_PRECEDENCE = [['+', '*']]
+V2_PRECEDENCE = [['+'], ['*']]
+
 
 def load_expressions():
     with open('input.txt', 'r') as f:
         return [line.strip() for line in f.readlines()]
 
-ops = {
-    '+': add,
-    '*': mul
-}
 
 class Expr:
     def __init__(self, left=None, right=None, op=None):
@@ -48,7 +54,7 @@ def scan_expression(expression, depth=0):
             output.append(n)
             buffer = []
 
-        if c in ops.keys():
+        if c in OPS:
             output.append(c)
 
         if c == '(':
@@ -74,7 +80,7 @@ def list_to_expr(expr_list, builder):
     for item in expr_list:
         if type(item) == list:
             ex = list_to_expr(item, builder)
-        elif item in ops.keys():
+        elif item in OPS:
             ex = item
         else:
             ex = Num(item)
@@ -82,65 +88,41 @@ def list_to_expr(expr_list, builder):
     return builder(exprs)
 
 
-def build(exprs):
-    expr_iter = iter(exprs)
-    last = None
-    ex = None
-    for item in expr_iter:
-        if item in ops.keys():
-            ex = Expr(left=last, right=next(expr_iter), op=ops[item])
-            last = ex
-        else:
-            last = item
-    print(f'build -> {ex} = {ex.eval()}')
-    return ex
-
-
-def build2(precedence, exprs):
+def build(precedence, exprs):
     for prec in precedence:
         for i in range(len(exprs)):
             item = exprs[i]
             if item in prec:
                 left = exprs[i-1]
                 right = exprs[i+1]
-                op = ops[item]
+                op = OPS[item]
                 expr = Expr(left=left, right=right, op=op)
                 exprs[i-1:i+2] = [None, None, expr]
         exprs = list(filter(None, exprs))
-    print(f'build2 -> {exprs[0]} = {exprs[0].eval()}')
-    print(exprs[0].eval())
     return exprs[0]
 
 
-def evaluate(expression):
+def evaluate(expression, builder):
     i, s = scan_expression(expression)
-    exp = list_to_expr(s, build)
+    exp = list_to_expr(s, builder)
     ans = exp.eval()
-    ex2 = list_to_expr(s, lambda exprs: build2([['+','*']], exprs))
-    ans2 = ex2.eval()
-    assert ans == ans2
     return ans
 
 
 def solve():
-    assert evaluate('2 * 3 + (4 * 5)') == 26
-    assert evaluate('1 + ((2 * 5) + 3) + 9') == 23
-    assert evaluate('1 + (2 * 3) + (4 * (5 + 6))') == 51
-    assert evaluate('((2 + 4 * 9) * (6 + 9 * 8 + 6) + 6) + 2 + 4 * 2') == 13632
-    answers = [evaluate(exp) for exp in load_expressions()]
+    builder = partial(build, V1_PRECEDENCE)
+    assert evaluate('2 * 3 + (4 * 5)', builder) == 26
+    assert evaluate('1 + ((2 * 5) + 3) + 9', builder) == 23
+    assert evaluate('1 + (2 * 3) + (4 * (5 + 6))', builder) == 51
+    answers = [evaluate(exp, builder) for exp in load_expressions()]
     print(f'part one answer = {sum(answers)}')
 
-
-def test():
-    i, out = scan_expression('2 * 3 + (4 * 5)')
-    print(out)
-    ex = list_to_expr(out, build)
-    ex2 = list_to_expr(out, lambda exprs: build2([['+','*']], exprs))
-    print(ex.eval())
+    builder2 = partial(build, V2_PRECEDENCE)
+    answers = [evaluate(exp, builder2) for exp in load_expressions()]
+    print(f'part two answer = {sum(answers)}')
 
 
 if __name__ == '__main__':
-    test()
     solve()
 
 '''
