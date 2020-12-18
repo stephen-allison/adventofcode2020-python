@@ -69,13 +69,6 @@ def scan_expression(expression, depth=0):
     return i, output
 
 
-def evaluate(expression):
-    i, s = scan_expression(expression)
-    exp = list_to_expr(s, build)
-    ans = exp.eval()
-    return ans
-
-
 def list_to_expr(expr_list, builder):
     exprs = []
     for item in expr_list:
@@ -99,20 +92,34 @@ def build(exprs):
             last = ex
         else:
             last = item
+    print(f'build -> {ex} = {ex.eval()}')
     return ex
 
 
-def build2(exprs):
-    expr_iter = iter(exprs)
-    last = None
-    ex = None
-    for item in expr_iter:
-        if item in ops.keys():
-            ex = Expr(left=last, right=next(expr_iter), op=ops[item])
-            last = ex
-        else:
-            last = item
-    return ex
+def build2(precedence, exprs):
+    for prec in precedence:
+        for i in range(len(exprs)):
+            item = exprs[i]
+            if item in prec:
+                left = exprs[i-1]
+                right = exprs[i+1]
+                op = ops[item]
+                expr = Expr(left=left, right=right, op=op)
+                exprs[i-1:i+2] = [None, None, expr]
+        exprs = list(filter(None, exprs))
+    print(f'build2 -> {exprs[0]} = {exprs[0].eval()}')
+    print(exprs[0].eval())
+    return exprs[0]
+
+
+def evaluate(expression):
+    i, s = scan_expression(expression)
+    exp = list_to_expr(s, build)
+    ans = exp.eval()
+    ex2 = list_to_expr(s, lambda exprs: build2([['+','*']], exprs))
+    ans2 = ex2.eval()
+    assert ans == ans2
+    return ans
 
 
 def solve():
@@ -125,9 +132,10 @@ def solve():
 
 
 def test():
-    i, out = scan_expression('7 + 2 * (3 + 1 * 2)')
+    i, out = scan_expression('2 * 3 + (4 * 5)')
     print(out)
     ex = list_to_expr(out, build)
+    ex2 = list_to_expr(out, lambda exprs: build2([['+','*']], exprs))
     print(ex.eval())
 
 
