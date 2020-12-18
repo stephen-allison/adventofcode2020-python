@@ -6,6 +6,8 @@ OPS = {
     '*': mul
 }
 
+SUBEXPR_START = '('
+SUBEXPR_END = ')'
 V1_PRECEDENCE = [['+', '*']]
 V2_PRECEDENCE = [['+'], ['*']]
 
@@ -25,7 +27,7 @@ class Expr:
         return self.op(self._left.eval(), self._right.eval())
 
     def __str__(self):
-        return f'expr: L:{self._left} O:{self.op} R:{self._right}'
+        return f'expr: L:{self._left} Op:{self.op} R:{self._right}'
 
 
 class Num:
@@ -39,38 +41,36 @@ class Num:
         return f'Num({self.val})'
 
 
-def scan_expression(expression, depth=0):
-    buffer = []
+def scan_expression(expression, start=0, expression_end=None):
+    digits = []
     output = []
-    i = 0
+    i = start
+
+    def read_digits():
+        n = (int(''.join(digits)))
+        output.append(n)
+        digits[:] = []
 
     while i < len(expression):
         c = expression[i]
 
         if c in '0123456789':
-            buffer.append(c)
-        elif buffer:
-            n = (int(''.join(buffer)))
-            output.append(n)
-            buffer = []
+            digits.append(c)
+        elif digits:
+            read_digits()
 
         if c in OPS:
             output.append(c)
+        elif c == SUBEXPR_START:
+            i, expr = scan_expression(expression, i + 1, SUBEXPR_END)
+            output.append(expr)
+        elif c == expression_end:
+            return i, output
 
-        if c == '(':
-            shift, scan = scan_expression(expression[i+1:], depth+1)
-            i += (shift + 1)
-            output.append(scan)
-
-        elif c == ')':
-            if depth > 0:
-                return i, output
         i += 1
 
-    if buffer:
-        n = (int(''.join(buffer)))
-        output.append(n)
-        buffer = []
+    if digits:
+        read_digits()
 
     return i, output
 
@@ -103,7 +103,7 @@ def build(precedence, exprs):
 
 
 def evaluate(expression, builder):
-    i, s = scan_expression(expression)
+    _, s = scan_expression(expression)
     exp = list_to_expr(s, builder)
     ans = exp.eval()
     return ans
@@ -111,9 +111,11 @@ def evaluate(expression, builder):
 
 def solve():
     builder = partial(build, V1_PRECEDENCE)
+
     assert evaluate('2 * 3 + (4 * 5)', builder) == 26
     assert evaluate('1 + ((2 * 5) + 3) + 9', builder) == 23
     assert evaluate('1 + (2 * 3) + (4 * (5 + 6))', builder) == 51
+
     answers = [evaluate(exp, builder) for exp in load_expressions()]
     print(f'part one answer = {sum(answers)}')
 
@@ -121,24 +123,30 @@ def solve():
     answers = [evaluate(exp, builder2) for exp in load_expressions()]
     print(f'part two answer = {sum(answers)}')
 
+def test():
+    builder = partial(build, V1_PRECEDENCE)
+    evaluate('2 * 3 + (4 * 5)', builder)
 
 if __name__ == '__main__':
     solve()
 
 '''
 2 * 3 + (4 * 5)
-   +
-  / \
- *   *
-2 3 4 5
 
+Part two tree:
   *
  / \
 2   +
    3 \
       *
      4 5
+Part one tree:
+   +
+  / \
+ *   *
+2 3 4 5
 
+Part one tree:
 '1 + 2 * 3 + 4 * 5 + 6'
             +
            / 6
