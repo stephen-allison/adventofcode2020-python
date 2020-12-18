@@ -41,7 +41,7 @@ def tokenize(expression):
     digits = []
     tokens = []
 
-    def store_number_token():
+    def store_pending_number_token():
         if digits:
             n = (int(''.join(digits)))
             tokens.append(n)
@@ -51,32 +51,30 @@ def tokenize(expression):
         if c in '0123456789':
             digits.append(c)
         else:
-            if digits:
-                store_number_token()
+            store_pending_number_token()
             if c in OPS or c in (SUBEXPR_START, SUBEXPR_END):
                 tokens.append(c)
 
-    store_number_token()
-
+    store_pending_number_token()
     return tokens
 
 
-def build_expression(tokens, builder, start=0, expression_end=None):
+def build_expression(tokens, grouper, start=0, expression_end=None):
     exprs = []
     i = start
     while i < len(tokens):
-        item = tokens[i]
-        if item == SUBEXPR_START:
-            i, ex = build_expression(tokens, builder, i + 1, SUBEXPR_END)
-        elif item == expression_end:
+        token = tokens[i]
+        if token == SUBEXPR_START:
+            i, ex = build_expression(tokens, grouper, i + 1, SUBEXPR_END)
+        elif token == expression_end:
             break
-        elif item in OPS:
-            ex = item
+        elif token in OPS:
+            ex = token
         else:
-            ex = Num(item)
+            ex = Num(token)
         exprs.append(ex)
         i += 1
-    return i, builder(exprs)
+    return i, grouper(exprs)
 
 
 def group_expressions(precedence, exprs):
@@ -101,17 +99,22 @@ def evaluate(expression, builder):
 
 
 def solve():
-    builder = partial(group_expressions, V1_PRECEDENCE)
+    grouper = partial(group_expressions, V1_PRECEDENCE)
 
-    assert evaluate('2 * 3 + (4 * 5)', builder) == 26
-    assert evaluate('1 + ((2 * 5) + 3) + 9', builder) == 23
-    assert evaluate('1 + (2 * 3) + (4 * (5 + 6))', builder) == 51
+    assert evaluate('2 * 3 + (4 * 5)', grouper) == 26
+    assert evaluate('1 + ((2 * 5) + 3) + 9', grouper) == 23
+    assert evaluate('1 + (2 * 3) + (4 * (5 + 6))', grouper) == 51
+    assert evaluate('5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))', grouper) == 12240
 
-    answers = [evaluate(exp, builder) for exp in load_expressions()]
+    answers = [evaluate(exp, grouper) for exp in load_expressions()]
     print(f'part one answer = {sum(answers)}')
 
-    builder2 = partial(group_expressions, V2_PRECEDENCE)
-    answers = [evaluate(exp, builder2) for exp in load_expressions()]
+    grouper = partial(group_expressions, V2_PRECEDENCE)
+    assert evaluate('2 * 3 + (4 * 5)', grouper) == 46
+    assert evaluate('1 + ((2 * 5) + 3) + 9', grouper) == 23
+    assert evaluate('1 + (2 * 3) + (4 * (5 + 6))', grouper) == 51
+    assert evaluate('5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))', grouper) == 669060
+    answers = [evaluate(exp, grouper) for exp in load_expressions()]
     print(f'part two answer = {sum(answers)}')
 
 
