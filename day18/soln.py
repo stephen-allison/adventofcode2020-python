@@ -8,7 +8,7 @@ V1_PRECEDENCE = [['+', '*']]
 V2_PRECEDENCE = [['+'], ['*']]
 
 
-def load_expressions():
+def load_expression_strings():
     with open('input.txt', 'r') as f:
         return [line.strip() for line in f.readlines()]
 
@@ -37,7 +37,7 @@ class Num:
         return f'Num({self.val})'
 
 
-def tokenize(expression):
+def tokenize(expression_string):
     digits = []
     tokens = []
 
@@ -47,7 +47,7 @@ def tokenize(expression):
             tokens.append(n)
             digits[:] = []
 
-    for c in expression:
+    for c in expression_string:
         if c in '0123456789':
             digits.append(c)
         else:
@@ -91,9 +91,9 @@ def group_expressions(precedence, exprs):
     return exprs[0]
 
 
-def evaluate(expression, builder):
-    s = tokenize(expression)
-    _, exp = build_expression(s, builder)
+def evaluate(expression_string, grouper):
+    toks = tokenize(expression_string)
+    _, exp = build_expression(toks, grouper)
     ans = exp.eval()
     return ans
 
@@ -106,7 +106,7 @@ def solve():
     assert evaluate('1 + (2 * 3) + (4 * (5 + 6))', grouper) == 51
     assert evaluate('5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))', grouper) == 12240
 
-    answers = [evaluate(exp, grouper) for exp in load_expressions()]
+    answers = [evaluate(exp, grouper) for exp in load_expression_strings()]
     print(f'part one answer = {sum(answers)}')
 
     grouper = partial(group_expressions, V2_PRECEDENCE)
@@ -114,7 +114,7 @@ def solve():
     assert evaluate('1 + ((2 * 5) + 3) + 9', grouper) == 23
     assert evaluate('1 + (2 * 3) + (4 * (5 + 6))', grouper) == 51
     assert evaluate('5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))', grouper) == 669060
-    answers = [evaluate(exp, grouper) for exp in load_expressions()]
+    answers = [evaluate(exp, grouper) for exp in load_expression_strings()]
     print(f'part two answer = {sum(answers)}')
 
 
