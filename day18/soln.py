@@ -18,20 +18,8 @@ class Expr:
     def eval(self):
         return self.op(self._left.eval(), self._right.eval())
 
-    def set_arg(self, expr):
-        if self._left:
-            self._right = expr
-        else:
-            self._left = expr
-
-    def complete(self):
-        return self._left and self._right and self.op
-
     def __str__(self):
         return f'expr: L:{self._left} O:{self.op} R:{self._right}'
-
-    def __repr__(self):
-        return str(self)
 
 
 class Num:
@@ -44,81 +32,64 @@ class Num:
     def __str__(self):
         return f'Num({self.val})'
 
-    def __repr__(self):
-        return str(self)
-
 
 def scan_expression(expression, depth=0):
     buffer = []
     output = []
     i = 0
-    expr = Expr()
+
     while i < len(expression):
         c = expression[i]
-        if expr.complete() and c != ')':
-            expr = Expr(left=expr)
 
         if c in '0123456789':
             buffer.append(c)
         elif buffer:
             n = (int(''.join(buffer)))
             output.append(n)
-            expr.set_arg(Num(n))
             buffer = []
 
         if c in ops.keys():
             output.append(c)
-            expr.op = ops[c]
 
         if c == '(':
-            shift, scan, sub_expr = scan_expression(expression[i+1:], depth+1)
+            shift, scan = scan_expression(expression[i+1:], depth+1)
             i += (shift + 1)
             output.append(scan)
-            expr.set_arg(sub_expr)
 
         elif c == ')':
             if depth > 0:
-                return i, output, expr
+                return i, output
         i += 1
 
     if buffer:
         n = (int(''.join(buffer)))
         output.append(n)
-        expr.set_arg(Num(n))
         buffer = []
 
-    return i, output, expr
+    return i, output
 
 
 def evaluate(expression):
-    i, s, exp = scan_expression(expression)
-    ans = (exp.eval())
-    print(f'{expression} = {ans}')
-    print(s)
-    print(exp)
-    ex2 = list_to_expr(s)
-    ans2 = ex2.eval()
-    assert ans == ans2
+    i, s = scan_expression(expression)
+    exp = list_to_expr(s, build)
+    ans = exp.eval()
     return ans
 
-def test():
-    i, out, expr = scan_expression('7 + 2 * (3 + 1 * 2)')
-    print(out)
-    ex = list_to_expr(out)
-    print(ex.eval())
 
-
-def list_to_expr(expr_list):
+def list_to_expr(expr_list, builder):
     exprs = []
     for item in expr_list:
         if type(item) == list:
-            ex = list_to_expr(item)
+            ex = list_to_expr(item, builder)
         elif item in ops.keys():
             ex = item
         else:
             ex = Num(item)
         exprs.append(ex)
+    return builder(exprs)
 
+
+def build(exprs):
     expr_iter = iter(exprs)
     last = None
     ex = None
@@ -131,6 +102,17 @@ def list_to_expr(expr_list):
     return ex
 
 
+def build2(exprs):
+    expr_iter = iter(exprs)
+    last = None
+    ex = None
+    for item in expr_iter:
+        if item in ops.keys():
+            ex = Expr(left=last, right=next(expr_iter), op=ops[item])
+            last = ex
+        else:
+            last = item
+    return ex
 
 
 def solve():
@@ -142,9 +124,16 @@ def solve():
     print(f'part one answer = {sum(answers)}')
 
 
+def test():
+    i, out = scan_expression('7 + 2 * (3 + 1 * 2)')
+    print(out)
+    ex = list_to_expr(out, build)
+    print(ex.eval())
+
+
 if __name__ == '__main__':
+    test()
     solve()
-    #test()
 
 '''
 2 * 3 + (4 * 5)
