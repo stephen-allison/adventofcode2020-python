@@ -43,12 +43,12 @@ def tokenize(expression_string):
 
     def store_pending_number_token():
         if digits:
-            n = (int(''.join(digits)))
+            n = int(''.join(digits))
             tokens.append(n)
             digits[:] = []
 
     for c in expression_string:
-        if c in '0123456789':
+        if c.isdigit():
             digits.append(c)
         else:
             store_pending_number_token()
@@ -77,11 +77,11 @@ def build_expression(tokens, grouper, start=0, expression_end=None):
     return i, grouper(exprs)
 
 
-def group_expressions(precedence, exprs):
-    for prec in precedence:
+def group_expressions(precedence_levels, exprs):
+    for operators in precedence_levels:
         for i in range(len(exprs)):
             item = exprs[i]
-            if item in prec:
+            if item in operators:
                 left = exprs[i-1]
                 right = exprs[i+1]
                 op = OPS[item]
@@ -94,13 +94,12 @@ def group_expressions(precedence, exprs):
 def evaluate(expression_string, grouper):
     toks = tokenize(expression_string)
     _, exp = build_expression(toks, grouper)
-    ans = exp.eval()
-    return ans
+    answer = exp.eval()
+    return answer
 
 
 def solve():
     grouper = partial(group_expressions, V1_PRECEDENCE)
-
     assert evaluate('2 * 3 + (4 * 5)', grouper) == 26
     assert evaluate('1 + ((2 * 5) + 3) + 9', grouper) == 23
     assert evaluate('1 + (2 * 3) + (4 * (5 + 6))', grouper) == 51
