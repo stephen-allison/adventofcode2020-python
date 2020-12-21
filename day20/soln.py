@@ -10,6 +10,12 @@ RIGHT = 1
 BOTTOM = 2
 LEFT = 3
 
+MONSTER = [
+    '                  # ',
+    '#    ##    ##    ###',
+    ' #  #  #  #  #  #'
+]
+
 def load_tiles():
     tiles = []
     tile_lines = []
@@ -19,7 +25,7 @@ def load_tiles():
         for line in f.readlines():
             line = line.strip()
             if not line:
-                tiles.append(Tile(tile_name, tile_lines, grid))
+                tiles.append(Tile(tile_name, tile_lines))
             elif line.startswith('Tile'):
                 tile_name = line
                 tile_lines = []
@@ -38,7 +44,7 @@ class Grid:
     def place(self, x, y, tiles):
         options = [t for t in tiles if self.try_tile(t, x, y)]
         if options:
-            log(f'placed {options[0].name} at {x},{y}')
+            #log(f'placed {options[0].name} at {x},{y}')
             self.contents[(x,y)] = options[0]
             return options[0]
         return None
@@ -87,7 +93,7 @@ class Grid:
 
 
 class Tile:
-    def __init__(self, name, tile_lines, grid):
+    def __init__(self, name, tile_lines):
         self.name = name[:-1]
         self.outside_edges = []
         self.side_length = len(tile_lines)
@@ -113,6 +119,31 @@ class Tile:
     def get_lines(self):
         return (l for l in self._lines)
 
+    def get_char(self, x, y):
+        return self._lines[y][x]
+
+    def count_char(self, char):
+        return sum(line.count(char) for line in self._lines)
+
+    def find(self, pattern):
+        matching_locations = []
+        for y, x in product(range(self.side_length), range(self.side_length)):
+        #for y, x in product([0], [0]):
+            try:
+                match = []
+                for cx, cy in pattern:
+                    check_pos = (x+cx, y+cy)
+                    ch = self.get_char(*check_pos)
+                    #print(f'{x},{y} + {cx},{cy} -> {check_pos} = {ch}')
+                    if ch == '#':
+                        match.append(check_pos)
+                if len(match) == len(pattern):
+                    log(f'matched monster at {x}, {y}')
+                    matching_locations.extend(match)
+            except IndexError:
+                pass
+        return matching_locations
+
     def mark_outside_edge(self, edge_str):
         self.outside_edges.append(edge_str)
 
@@ -128,7 +159,6 @@ class Tile:
             for i in range(4):
                 self.rotate_cw()
                 yield
-        yield
         yield from rotate_round()
 
         self.flip_x()
@@ -180,10 +210,10 @@ class Image:
     def __init__(self, grid):
         self.pixels = {}
         self.grid_side = grid.side
-        self.cell_side = grid.cell_side
         self.pixels = {k: t.centre() for k, t in grid.contents.items()}
+        self.tile = Tile('Image 0:', self._as_string().split('\n'))
 
-    def __str__(self):
+    def _as_string(self):
         rows = []
         for y in range(self.grid_side):
             row_gen = []
@@ -194,6 +224,24 @@ class Image:
             lines = [''.join(g) for g in gen]
             rows.extend(lines)
         return '\n'.join(rows)
+
+    def find(self, pattern):
+        found = []
+        for _ in self.tile.orientations():
+            found.append(self.tile.find(pattern))
+        return found
+
+    def __str__(self):
+        return str(self.tile)
+
+
+def monster_pattern():
+    coords = []
+    for y, line in enumerate(MONSTER):
+        for x, ch in enumerate(line):
+            if ch == '#':
+                coords.append((x,y))
+    return coords
 
 def solve():
     #test_tile()
@@ -253,6 +301,16 @@ def solve():
 
     img = Image(grid)
     log(img)
+    log('\n'.join(MONSTER))
+    monster = monster_pattern()
+    log(monster)
+    matched = filter(None, img.find(monster))
+    matched_sets = list(map(set, matched))
+    print(f'found monsters: {list(map(len, matched_sets))}')
+    hash_count = img.tile.count_char('#')
+    print(f'hash_count {hash_count}')
+    print(f'sets equal? {matched_sets[0] == matched_sets[1]}')
+    print(f'part two ans: {hash_count - max(map(len, matched_sets))}')
 
 
 def test_tile():
