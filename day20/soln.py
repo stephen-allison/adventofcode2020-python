@@ -14,7 +14,7 @@ def load_tiles():
     tiles = []
     tile_lines = []
     tile_name = None
-    grid = Grid(12)
+    grid = Grid(12, 10)
     with open('input.txt', 'r') as f:
         for line in f.readlines():
             line = line.strip()
@@ -30,9 +30,11 @@ def load_tiles():
 
 
 class Grid:
-    def __init__(self, side):
+    def __init__(self, side, cell_side):
         self.side = side
+        self.cell_side = cell_side
         self.contents = {}
+        self.opts = []
 
     def add_tile(self, tile):
         if tile.grid_pos in self.contents:
@@ -45,17 +47,46 @@ class Grid:
         self.contents[tile.grid_pos] = tile
 
     def try_tile(self, tile, x, y):
+        print(tile)
+        print('~~~')
         if x == y == 0:
             tile.match_orientation((True, False, False, True))
+            return True
 
-        neighbours = [self.contents[pos] for pos in
-                            [(x,y-1), (x+1, y), (x, y+1), (x-1, y)]
-                            if pos in self.contents]
+        neighbours = [self.contents.get(pos) for pos in
+                            [(x,y-1), (x+1, y), (x, y+1), (x-1, y)]]
 
-        log(f'{len(neighbours)} to match')
-        matches = []
-        if all(matches):
-            self.contents[(x,y)] = tile
+        for _ in tile.orientations():
+            matches = []
+            for i, n in enumerate(neighbours):
+                if n and tile.edge(i) in n._edges:
+                    print(f'possible match {i} {tile._edges} <> {n._edges}')
+
+                if not n:
+                    matched = True
+                elif i == TOP:
+                    matched = tile.edge(TOP) == n.edge(BOTTOM)
+                elif i == RIGHT:
+                    matched = tile.edge(RIGHT) == n.edge(LEFT)
+                elif i == BOTTOM:
+                    matched = tile.edge(BOTTOM) == n.edge(TOP)
+                elif i == LEFT:
+                    print(f'n.Right={n.edge(RIGHT)} t.Left={tile.edge(LEFT)}')
+                    matched = tile.edge(LEFT) == n.edge(RIGHT)
+                matches.append(matched)
+            print(f'all matches {matches}')
+            if all(matches):
+                break
+        return all(matches)
+
+    def place(self, x, y, tiles):
+        options = [t for t in tiles if self.try_tile(t, x, y)]
+        self.opts.append(((x,y),options))
+        if options:
+            log(f'placed {options[0].name} at {x},{y}')
+            self.contents[(x,y)] = options[0]
+            return options[0]
+        return None
 
     def __str__(self):
         rows = []
@@ -66,7 +97,7 @@ class Grid:
                 if tile:
                     row_gen.append(tile.get_lines())
                 else:
-                    row_gen.append('-'*10 for _ in range(10))
+                    row_gen.append('-'*self.cell_side for _ in range(self.cell_side))
             gen = zip(*row_gen)
             lines = [' '.join(g) for g in gen]
             rows.extend(lines)
@@ -99,6 +130,9 @@ class Tile:
         for edge in self._edges:
             yield edge[::-1]
 
+    def edge(self, edge_num):
+        return self._edges[edge_num]
+
     def set_grid_pos(self, x, y):
         log(f'{self.name} @ {x},{y}')
         self.grid_pos = (x, y)
@@ -116,6 +150,28 @@ class Tile:
     def match_orientation(self, orientation):
         while self.orientation() != orientation:
             self.rotate_cw()
+
+    def orientations(self):
+        def rotate_round():
+            for i in range(4):
+                self.rotate_cw()
+                yield
+        yield
+        yield from rotate_round()
+
+        self.flip_x()
+        yield from rotate_round()
+        self.flip_x()
+
+        self.flip_y()
+        yield from rotate_round()
+        self.flip_y()
+
+        self.flip_x()
+        self.flip_y()
+        yield from rotate_round()
+
+
 
     def match_edge(self, tile):
         for i, edge in enumerate(self._edges):
@@ -209,6 +265,8 @@ class Tile:
 
 
 def solve():
+    #test_tile()
+    #return
     tiles, grid = load_tiles()
     counts = Counter(chain(*[t.edges() for t in tiles]))
     pprint(counts)
@@ -244,9 +302,36 @@ def solve():
     }
 
     newSolve = True
+    all_tiles = set(tiles) - {corner0}
     if newSolve:
-        grid.try_tile(corner0, 0, 0)
+        print(corner0)
+        print('---')
+        grid.place(0, 0, [corner0])
         log(grid)
+        print('')
+        to_add = edges - {corner0}
+        for i in range(1,12):
+            added = grid.place(i, 0, to_add)
+            to_add -= {added}
+            all_tiles -= {added}
+        log(grid)
+        for x,y in product([0,11], range(1,11)):
+            added = grid.place(x, y, to_add)
+            to_add -= {added}
+            all_tiles -= {added}
+        log(grid)
+        for i in range(0,12):
+            added = grid.place(i, 11, to_add)
+            to_add -= {added}
+            all_tiles -= {added}
+        log(grid)
+        for y in range(1, 11):
+            for x in range(1, 11):
+                added = grid.place(x, y, all_tiles)
+                all_tiles -= {added}
+        log(grid)
+
+
 
     if not newSolve:
         corner0.set_grid_pos(*corner_positions[corner0.orientation()])
@@ -285,6 +370,64 @@ def solve():
         print(f'done {len(placed)} {len(rest)}, {i}')
 
         print(corner0.grid)
+
+def test_tile():
+    lines = ['#.##',
+             '.#..',
+             '#.#.',
+             '.##.']
+    lines2 = ['#...',
+              '....',
+              '#..#',
+              '##.#']
+    lines3 = ['##.#',
+              '....',
+              '.##.',
+              '.##.']
+    lines4 = [
+              '#..#',
+              '.#..',
+              '###.',
+              '##..',
+              ]
+    g = Grid(4, 4)
+    t = Tile('test 0:', lines, g)
+    t2 = Tile('test 1:', lines2, g)
+    t3 = Tile('test 2:', lines3, g)
+    t4 = Tile('test 3:', lines4, g)
+    t5 = Tile('test 4:', lines4, g)
+
+    print(t5)
+    print('double filp')
+    t5.flip_x()
+    print(t5)
+    print('+=+=+=+')
+
+
+    r_lines = ['.#.#',
+               '#.#.',
+               '##.#',
+               '...#']
+    print(t)
+    print('=====')
+    t.rotate_cw()
+    print(t)
+    print('=====')
+    print('\n'.join(r_lines))
+    assert str(t) == '\n'.join(r_lines)
+
+    t.rotate_ccw()
+    g.place(1, 1, [t])
+    print(g)
+    print('')
+    g.place(2, 1, [t2])
+    print(g)
+    g.place(1, 2, [t3])
+    print(g)
+    g.place(2, 2, [t4])
+    print(g)
+    g.place(2, 0, [t5])
+    print(g)
 
 if __name__ == '__main__':
     solve()
