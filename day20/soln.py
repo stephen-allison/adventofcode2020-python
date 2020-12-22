@@ -44,7 +44,6 @@ class Grid:
     def place(self, x, y, tiles):
         options = [t for t in tiles if self.try_tile(t, x, y)]
         if options:
-            #log(f'placed {options[0].name} at {x},{y}')
             self.contents[(x,y)] = options[0]
             return options[0]
         return None
@@ -107,7 +106,8 @@ class Tile:
         left = ''.join(line[0] for line in self._lines)
         self._edges = (top, right, bottom, left)
 
-    def edges(self):
+    def possible_edges(self):
+        '''all possible edges that a tile might have, flipped or non-flipped'''
         for edge in self._edges:
             yield edge
         for edge in self._edges:
@@ -128,14 +128,11 @@ class Tile:
     def find(self, pattern):
         matching_locations = []
         for y, x in product(range(self.side_length), range(self.side_length)):
-        #for y, x in product([0], [0]):
             try:
                 match = []
                 for cx, cy in pattern:
                     check_pos = (x+cx, y+cy)
-                    ch = self.get_char(*check_pos)
-                    #print(f'{x},{y} + {cx},{cy} -> {check_pos} = {ch}')
-                    if ch == '#':
+                    if self.get_char(*check_pos) == '#':
                         match.append(check_pos)
                 if len(match) == len(pattern):
                     log(f'matched monster at {x}, {y}')
@@ -148,29 +145,23 @@ class Tile:
         self.outside_edges.append(edge_str)
 
     def orientation(self):
+        '''tuple of bool - each entry is True if that edge (T,R,B,L)
+        is an outside edge'''
         return tuple(e in self.outside_edges for e in self._edges)
 
     def match_orientation(self, orientation):
+        '''rotate until outside edges match given orientation'''
         while self.orientation() != orientation:
             self.rotate_cw()
 
     def orientations(self):
+        '''all possible transformations of tile'''
         def rotate_round():
             for i in range(4):
                 self.rotate_cw()
                 yield
         yield from rotate_round()
-
         self.flip_x()
-        yield from rotate_round()
-        self.flip_x()
-
-        self.flip_y()
-        yield from rotate_round()
-        self.flip_y()
-
-        self.flip_x()
-        self.flip_y()
         yield from rotate_round()
 
     def _cols(self):
@@ -179,10 +170,6 @@ class Tile:
             cols.append(''.join(line[i] for line in self._lines))
         return cols
 
-    def rotate_ccw(self):
-        self._lines = [c for c in self._cols()[::-1]]
-        self._extract_edges()
-
     def rotate_cw(self):
         self._lines = [c[::-1] for c in self._cols()]
         self._extract_edges()
@@ -190,11 +177,6 @@ class Tile:
     def flip_x(self):
         self._lines = [c[::-1] for c in self._lines]
         self._extract_edges()
-
-    def flip_y(self):
-        self.rotate_cw()
-        self.flip_x()
-        self.rotate_ccw()
 
     def centre(self):
         return [l[1:-1] for l in self._lines[1:-1]]
@@ -243,19 +225,20 @@ def monster_pattern():
                 coords.append((x,y))
     return coords
 
+
 def solve():
-    #test_tile()
-    #return
     tiles, grid = load_tiles()
-    counts = Counter(chain(*[t.edges() for t in tiles]))
+    counts = Counter(chain(*[t.possible_edges() for t in tiles]))
 
     edge_map = defaultdict(list)
     for t in tiles:
-        for edge in t.edges():
+        for edge in t.possible_edges():
             edge_map[edge].append(t)
 
+    # find the outside edges, then build up from a corner
     outside_tiles = []
-    outside_edges = [k for k, v in counts.items() if v == 1]
+    # outward facing edges are not paired and so have count 1
+    outside_edges = [edge for edge, occs in counts.items() if occs == 1]
     for e in outside_edges:
         ts = edge_map[e]
         assert len(ts) == 1
@@ -264,52 +247,49 @@ def solve():
         t.mark_outside_edge(e)
 
     edges_counter = Counter(outside_tiles)
+    # corners have two unpaired edges, each with 2 orientations
+    # possible -> has count of 4
     corner_names = [k for k, v in edges_counter.items() if v == 4]
     print('Part 1 - corners are:', corner_names)
     corner_tiles = [t for t in tiles if t in corner_names]
-    edges = set(t for t in outside_tiles)
+    outside_edges = set(t for t in outside_tiles)
 
-    grid_side = 11
     corner0 = corner_tiles[0]
-
-    newSolve = True
-    all_tiles = set(tiles) - {corner0}
+    unplaced = set(tiles) - {corner0}
 
     grid.place(0, 0, [corner0])
     log(grid)
-    to_add = edges - {corner0}
+    unplaced_edges = outside_edges - {corner0}
     for i in range(1,12):
-        added = grid.place(i, 0, to_add)
-        to_add -= {added}
-        all_tiles -= {added}
+        added = grid.place(i, 0, unplaced_edges)
+        unplaced_edges -= {added}
     log(grid)
     for x,y in product([0,11], range(1,11)):
-        added = grid.place(x, y, to_add)
-        to_add -= {added}
-        all_tiles -= {added}
+        added = grid.place(x, y, unplaced_edges)
+        unplaced_edges -= {added}
     log(grid)
     for i in range(0,12):
-        added = grid.place(i, 11, to_add)
-        to_add -= {added}
-        all_tiles -= {added}
+        added = grid.place(i, 11, unplaced_edges)
+        unplaced_edges -= {added}
     log(grid)
+    #all edges now placed
+
+    # place all the other tiles
+    unplaced -= outside_edges
     for y in range(1, 11):
         for x in range(1, 11):
-            added = grid.place(x, y, all_tiles)
-            all_tiles -= {added}
+            added = grid.place(x, y, unplaced)
+            unplaced -= {added}
     log(grid)
+
 
     img = Image(grid)
     log(img)
     log('\n'.join(MONSTER))
     monster = monster_pattern()
-    log(monster)
     matched = filter(None, img.find(monster))
     matched_sets = list(map(set, matched))
-    print(f'found monsters: {list(map(len, matched_sets))}')
     hash_count = img.tile.count_char('#')
-    print(f'hash_count {hash_count}')
-    print(f'sets equal? {matched_sets[0] == matched_sets[1]}')
     print(f'part two ans: {hash_count - max(map(len, matched_sets))}')
 
 
@@ -358,7 +338,9 @@ def test_tile():
     print('\n'.join(r_lines))
     assert str(t) == '\n'.join(r_lines)
 
-    t.rotate_ccw()
+    t.rotate_cw()
+    t.rotate_cw()
+    t.rotate_cw()
     g.place(1, 1, [t])
     print(g)
     print('')
