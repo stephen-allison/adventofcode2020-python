@@ -38,7 +38,6 @@ def solve():
 
     found = set(k for k,v in possible.items() if len(v) == 1)
     while any(len(vals) > 1 for vals in possible.values()):
-        print(f'found {found}')
         new_finds = set()
         processed = set()
         for agen in found:
