@@ -56,39 +56,47 @@ class CircularBuffer:
         dest.next = first
 
 
-
-
 def play(input, rounds=10):
     nodes = [Node(i) for i in input]
     buffer = CircularBuffer(nodes)
-    for i in range(rounds):
+    min_input = min(input)
+    max_input = max(input)
+    for _ in range(rounds):
         to_move = buffer.clockwise_nodes(3)
         dest_val = buffer.start.value - 1
         dest = None
         while True:
-            if dest_val in input:
+            if min_input <= dest_val <= max_input:
                 dest = buffer.find(dest_val)
                 if dest not in to_move:
                     break
-            if dest_val <= min(input):
-                dest_val = max(input)
+            if dest_val <= min_input:
+                dest_val = max_input
             else:
                 dest_val -= 1
         buffer.move(dest, 3)
         buffer.start = buffer.start.next
 
-    final = buffer.clockwise_nodes(len(buffer) - 1, buffer.find(1))
-    result = ''.join([str(n.value) for n in final])
-    return result
+    return buffer
 
 
 def solve():
     input = [int(i) for i in '643719258']
-    print(f'part one answer = {play(input, 100)}')
+    buffer = play(input, 100)
+    nodes = buffer.clockwise_nodes(len(buffer) - 1, buffer.find(1))
+    result = ''.join([str(n.value) for n in nodes])
+    print(f'part one answer = {result}')
+    print('part two...')
+
+    input2 = input + [i for i in range(len(input) + 1, 1_000_001)]
+    buffer = play(input2, 10_000_000)
+    val1 = buffer.find(1).advance().value
+    val2 = buffer.find(1).advance(2).value
+    print(f'part 2 answer is {val1 * val2}')
 
 
 def test():
-    input = '389125467' #'643719258'
+    input = '389125467'
     nodes = [Node(int(i)) for i in input]
     buffer = CircularBuffer(nodes)
     for n in buffer:
