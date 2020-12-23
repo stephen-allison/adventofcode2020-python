@@ -1,24 +1,15 @@
+from itertools import islice
+
 class Node:
     def __init__(self, value):
         self.value = value
         self.next = None
 
-    def __str__(self):
-        return f'Node({self.value})'
-
-    def __iter__(self):
-        yield self
-        next_node = self.next
-        while next_node != self:
-            yield next_node
-            next_node = next_node.next
-
     def advance(self, n=1):
-        iterator = iter(self)
-        node = next(iterator)
+        next_node = self
         for _ in range(n):
-            node = next(iterator)
-        return node
+            next_node = next_node.next
+        return next_node
 
     def clockwise_nodes(self, count):
         return [self.advance(n) for n in range(1, count + 1)]
@@ -28,12 +19,9 @@ class CircularBuffer:
     def __init__(self, nodes):
         self.nodes = {n.value: n for n in nodes}
         self.current = nodes[0]
-        for node, next_node in zip(nodes, nodes[1:]):
+        for node, next_node in zip(nodes, islice(nodes, 1, None)):
             node.next = next_node
         nodes[-1].next = nodes[0]
-
-    def __iter__(self):
-        yield from iter(self.current)
 
     def __len__(self):
         return len(self.nodes)
@@ -78,9 +66,9 @@ def solve():
     nodes = cups.find(1).clockwise_nodes(len(cups) - 1)
     result = ''.join([str(n.value) for n in nodes])
     print(f'part one answer = {result}')
-    print('part two...')
 
-    input.extend([i for i in range(len(input) + 1, 1_000_001)])
+    print('part two...')
+    input.extend(i for i in range(len(input) + 1, 1_000_001))
     cups = play(input, 10_000_000)
     val1 = cups.find(1).advance().value
     val2 = cups.find(1).advance(2).value
